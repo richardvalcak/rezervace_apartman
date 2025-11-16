@@ -30,16 +30,15 @@ except:
 dny_tydne = ['Po','Út','St','Čt','Pá','So','Ne']
 mesice_cz = ["","leden","únor","březen","duben","květen","červen","červenec","srpen","září","říjen","listopad","prosinec"]
 
-def zobraz_kalendar(start_date, months=2):
+def zobraz_kalendar(start_date, months=3):  # změněno na 3 měsíce
     for m in range(months):
-        mesic_date = (start_date.replace(day=1) + timedelta(days=30*m))
-        rok = mesic_date.year
-        mesic = mesic_date.month
-
-        st.markdown(f"### {mesice_cz[mesic]} {rok}")
+        # posun o m měsíců od start_date
+        year = start_date.year + ((start_date.month + m -1)//12)
+        month = (start_date.month + m -1)%12 +1
+        st.markdown(f"### {mesice_cz[month]} {year}")
 
         cal = calendar.Calendar(firstweekday=0)
-        dni_mesice = list(cal.itermonthdates(rok, mesic))
+        dni_mesice = list(cal.itermonthdates(year, month))
 
         table_html = """
         <style>
@@ -63,7 +62,7 @@ def zobraz_kalendar(start_date, months=2):
         for i in range(0, len(dni_mesice), 7):
             table_html += "<tr>"
             for den in dni_mesice[i:i+7]:
-                if den.month != mesic:
+                if den.month != month:
                     table_html += "<td></td>"
                 else:
                     barva = "#81c995" if den not in obsazene_dny else "#f28b82"
@@ -73,5 +72,5 @@ def zobraz_kalendar(start_date, months=2):
         table_html += "</table>"
         st.markdown(table_html, unsafe_allow_html=True)
 
-# zobrazit kalendář 2 měsíce od dneška
-zobraz_kalendar(datetime.today(), months=2)
+# zobrazit kalendář 3 měsíce od dneška
+zobraz_kalendar(datetime.today(), months=3)
