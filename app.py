@@ -5,9 +5,9 @@ from icalendar import Calendar
 
 st.set_page_config(page_title="Rezervace Apartmán Tyršova", layout="centered")
 
-# --- Načtení obsazených dní z iCal ---
 ICAL_URL = "https://ical.booking.com/v1/export?t=641d7a68-4a90-4d73-b223-2668d2d33476"
 
+# --- Načtení obsazených dní ---
 def nacti_obsazene():
     obsazene = set()
     try:
@@ -24,13 +24,13 @@ def nacti_obsazene():
             while den < end:
                 obsazene.add(den)
                 den += timedelta(days=1)
-    except Exception as e:
-        st.error(f"Chyba načítání iCal: {e}")
+    except:
+        pass
     return obsazene
 
 obsazene_dny = nacti_obsazene()
 
-# --- Nápis nahoře ---
+# --- Úvodní text ---
 st.title("Kniha hostů – Rezervace")
 st.markdown("""
 Prosíme vás o vyplnění této knihy hostů.  
@@ -52,45 +52,47 @@ def zobraz_mesic(start_date):
     
     st.markdown(f"### {start_date.strftime('%B %Y')}")
     
-    cols = st.columns(7)
+    # Dny týdne
     dni_tydne = ["Po", "Út", "St", "Čt", "Pá", "So", "Ne"]
+    cols = st.columns(7)
     for i, d in enumerate(dni_tydne):
-        cols[i].markdown(f"**{d}**", unsafe_allow_html=True)
+        cols[i].markdown(f"<b>{d}</b>", unsafe_allow_html=True)
     
+    # Grid dní
     for i, den in enumerate(days):
         if i % 7 == 0:
             cols = st.columns(7)
-        key = f"{den}"
+        datum_str = den.strftime("%Y-%m-%d")
+        color = "#d4edda" if den not in obsazene_dny and den.month == start_date.month else "#f8d7da"
+        text = f"{den.day}"
+        if st.session_state.get('start_den') == den or st.session_state.get('end_den') == den:
+            color = "#cce5ff"
         if den.month != start_date.month:
-            for j in range(7):
-                if i+j >= len(days):
-                    break
-                cols[j].markdown(" ")
+            cols[i%7].markdown(" ", unsafe_allow_html=True)
             continue
         
-        if den in obsazene_dny:
-            cols[i%7].button(f"❌ {den.day}", disabled=True, key=key)
-        else:
-            if cols[i%7].button(f"✅ {den.day}", key=key):
-                if st.session_state['start_den'] is None:
-                    st.session_state['start_den'] = den
-                    st.session_state['end_den'] = None
-                elif st.session_state['end_den'] is None:
-                    if den < st.session_state['start_den']:
-                        st.session_state['start_den'], st.session_state['end_den'] = den, st.session_state['start_den']
-                    else:
-                        st.session_state['end_den'] = den
+        if cols[i%7].button(text, key=datum_str):
+            if den in obsazene_dny:
+                return
+            if st.session_state['start_den'] is None:
+                st.session_state['start_den'] = den
+                st.session_state['end_den'] = None
+            elif st.session_state['end_den'] is None:
+                if den < st.session_state['start_den']:
+                    st.session_state['start_den'], st.session_state['end_den'] = den, st.session_state['start_den']
                 else:
-                    st.session_state['start_den'] = den
-                    st.session_state['end_den'] = None
+                    st.session_state['end_den'] = den
+            else:
+                st.session_state['start_den'] = den
+                st.session_state['end_den'] = None
 
-# --- Zobrazení tří měsíců ---
+# --- Zobrazení 3 měsíců ---
 dnes = date.today()
 for m in range(3):
     mesic = (dnes.replace(day=1) + timedelta(days=32*m)).replace(day=1)
     zobraz_mesic(mesic)
 
-# --- Zobrazení vybraného období ---
+# --- Vybrané období ---
 if st.session_state['start_den']:
     text = f"Vybrané období: {st.session_state['start_den'].strftime('%d.%m.%Y')}"
     if st.session_state['end_den']:
@@ -110,3 +112,17 @@ if st.session_state['start_den']:
                 st.error("Vyplňte všechny povinné údaje a souhlas.")
             else:
                 st.success("Žádost byla odeslána. Brzy vás budeme kontaktovat!")
+
+# --- CSS pro hezký vzhled ---
+st.markdown("""
+<style>
+div.stButton > button:first-child {
+    height: 2.5em;
+    margin: 2px;
+    border-radius: 8px;
+    border: none;
+    font-weight: bold;
+    color: #212529;
+}
+</style>
+""", unsafe_allow_html=True)
