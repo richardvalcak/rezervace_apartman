@@ -16,15 +16,6 @@ Vaše údaje jsou uchovávány v souladu s platnými právními předpisy a slou
 if "obsazene_dny" not in st.session_state:
     st.session_state.obsazene_dny = set()  # např. "2025-11-20"
 
-# --- Generování seznamu dostupných dní ---
-dnes = datetime.today()
-dostupne_dny = []
-for i in range(60):  # následujících 60 dní
-    den = dnes + timedelta(days=i)
-    den_str = den.strftime("%Y-%m-%d")
-    if den_str not in st.session_state.obsazene_dny:
-        dostupne_dny.append(den_str)
-
 # --- Formulář rezervace ---
 with st.form("rezervace_form"):
     st.subheader("1. Osoba")
@@ -34,13 +25,18 @@ with st.form("rezervace_form"):
     d1 = st.text_input("Doklad *", placeholder="123456789 (OP)")
 
     st.markdown("---")
-    st.subheader("Výběr dní pobytu")
-
-    if dostupne_dny:
-        vybrane_dny = st.multiselect("Vyberte volné dny", dostupne_dny)
-    else:
-        st.warning("Momentálně nejsou volné žádné termíny.")
-        vybrane_dny = []
+    st.subheader("Výběr období pobytu")
+    
+    # Výběr období pomocí dvojice date_input
+    dnes = datetime.today().date()
+    default_start = dnes
+    default_end = dnes + timedelta(days=1)
+    
+    start_date, end_date = st.date_input(
+        "Vyberte období pobytu",
+        value=(default_start, default_end),
+        min_value=dnes
+    )
 
     st.markdown("---")
     souhlas = st.checkbox("Souhlasím se zpracováním osobních údajů podle výše uvedeného textu.")
@@ -51,8 +47,8 @@ with st.form("rezervace_form"):
         errors = []
         if not all([j1.strip(), n1.strip(), a1.strip(), d1.strip()]):
             errors.append("Vyplňte všechna povinná pole.")
-        if not vybrane_dny:
-            errors.append("Vyberte alespoň jeden den pobytu.")
+        if start_date > end_date:
+            errors.append("Konec období musí být po začátku.")
         if not souhlas:
             errors.append("Souhlas je povinný.")
 
@@ -60,7 +56,13 @@ with st.form("rezervace_form"):
             for e in errors:
                 st.error(e)
         else:
-            # Označení dní jako obsazené
-            for den in vybrane_dny:
-                st.session_state.obsazene_dny.add(den)
-            st.success(f"Rezervace na dny {', '.join(vybrane_dny)} byla úspěšná! 🏡")
+            # Generování všech dní v období
+            rezervovane_dny = []
+            delta = end_date - start_date
+            for i in range(delta.days + 1):
+                den = start_date + timedelta(days=i)
+                den_str = den.strftime("%Y-%m-%d")
+                st.session_state.obsazene_dny.add(den_str)
+                rezervovane_dny.append(den_str)
+            
+            st.success(f"Rezervace na dny {', '.join(rezervovane_dny)} byla úspěšná! 🏡")
