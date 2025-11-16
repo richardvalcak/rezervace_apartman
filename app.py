@@ -5,7 +5,7 @@ import requests
 from icalendar import Calendar
 
 st.set_page_config(page_title="Dostupnost Apartmánu", layout="wide")
-st.title("Kniha hostů – Dostupnost Apartmánu Tyršova")
+st.title("Dostupnost Apartmánu Tyršova")
 
 # iCal URL z Booking.com
 ICAL_URL = "https://ical.booking.com/v1/export?t=641d7a68-4a90-4d73-b223-2668d2d33476"
