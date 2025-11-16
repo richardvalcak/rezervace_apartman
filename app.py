@@ -39,31 +39,66 @@ Vaše údaje jsou uchovávány v souladu s platnými právními předpisy a slou
 Apartmán Tyršova, Tyršova 1239/1, 669 02 Znojmo
 """)
 
-# --- Kalendář aktuálního měsíce ---
-dnes = datetime.today()
-start_mesic = date(dnes.year, dnes.month, 1)
-end_mesic = (start_mesic + timedelta(days=32)).replace(day=1)
+# --- Výběr období ---
+if 'start_den' not in st.session_state:
+    st.session_state['start_den'] = None
+if 'end_den' not in st.session_state:
+    st.session_state['end_den'] = None
 
-st.subheader(f"Dostupné dny v {dnes.strftime('%B %Y')}")
-
-den = start_mesic
-while den < end_mesic:
-    col1, col2, col3, col4, col5, col6, col7 = st.columns(7)
-    for i in range(7):
-        if den >= end_mesic:
-            break
-        col = [col1, col2, col3, col4, col5, col6, col7][i]
-        label = f"{den.day}"
+def zobraz_mesic(start_date):
+    import calendar
+    cal = calendar.Calendar(firstweekday=0)
+    days = list(cal.itermonthdates(start_date.year, start_date.month))
+    
+    st.markdown(f"### {start_date.strftime('%B %Y')}")
+    
+    cols = st.columns(7)
+    dni_tydne = ["Po", "Út", "St", "Čt", "Pá", "So", "Ne"]
+    for i, d in enumerate(dni_tydne):
+        cols[i].markdown(f"**{d}**", unsafe_allow_html=True)
+    
+    for i, den in enumerate(days):
+        if i % 7 == 0:
+            cols = st.columns(7)
+        key = f"{den}"
+        if den.month != start_date.month:
+            for j in range(7):
+                if i+j >= len(days):
+                    break
+                cols[j].markdown(" ")
+            continue
+        
         if den in obsazene_dny:
-            col.button(f"❌ {label}", disabled=True, key=str(den))
+            cols[i%7].button(f"❌ {den.day}", disabled=True, key=key)
         else:
-            if col.button(f"✅ {label}", key=str(den)):
-                st.session_state['vybrany_den'] = den
-        den += timedelta(days=1)
+            if cols[i%7].button(f"✅ {den.day}", key=key):
+                if st.session_state['start_den'] is None:
+                    st.session_state['start_den'] = den
+                    st.session_state['end_den'] = None
+                elif st.session_state['end_den'] is None:
+                    if den < st.session_state['start_den']:
+                        st.session_state['start_den'], st.session_state['end_den'] = den, st.session_state['start_den']
+                    else:
+                        st.session_state['end_den'] = den
+                else:
+                    st.session_state['start_den'] = den
+                    st.session_state['end_den'] = None
 
-# --- Zobrazení vybraného dne a formulář žádosti ---
-if 'vybrany_den' in st.session_state:
-    st.success(f"Vybrali jste den: {st.session_state['vybrany_den'].strftime('%d.%m.%Y')}")
+# --- Zobrazení tří měsíců ---
+dnes = date.today()
+for m in range(3):
+    mesic = (dnes.replace(day=1) + timedelta(days=32*m)).replace(day=1)
+    zobraz_mesic(mesic)
+
+# --- Zobrazení vybraného období ---
+if st.session_state['start_den']:
+    text = f"Vybrané období: {st.session_state['start_den'].strftime('%d.%m.%Y')}"
+    if st.session_state['end_den']:
+        text += f" - {st.session_state['end_den'].strftime('%d.%m.%Y')}"
+    st.success(text)
+
+# --- Formulář žádosti ---
+if st.session_state['start_den']:
     with st.form("rezervace_form"):
         jmeno = st.text_input("Jméno a příjmení *")
         email = st.text_input("Email *")
