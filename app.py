@@ -34,7 +34,8 @@ with st.form("rezervace_form"):
 
     st.markdown("---")
     st.subheader("Výběr dne pobytu")
-    
+
+    # Výběr měsíce
     dnes = datetime.today()
     mesic = st.selectbox(
         "Vyberte měsíc",
@@ -43,18 +44,18 @@ with st.form("rezervace_form"):
 
     # Inicializace dat – volné dny (demo)
     if "rezervace_data" not in st.session_state:
-        st.session_state.rezervace_data = {}
-        rok, mesic_c = map(int, mesic.split("-"))
-        _, pocet_dni = calendar.monthrange(rok, mesic_c)
-        for d in range(1, pocet_dni + 1):
-            den = datetime(rok, mesic_c, d).strftime("%Y-%m-%d")
-            st.session_state.rezervace_data[den] = {"volno": True, "cena": 1000}
+        st.session_state.rezervace_data = {}  # klíč = "YYYY-MM-DD", hodnota = True/False
+    rok, mesic_c = map(int, mesic.split("-"))
+    _, pocet_dni = calendar.monthrange(rok, mesic_c)
+    for d in range(1, pocet_dni + 1):
+        den = datetime(rok, mesic_c, d).strftime("%Y-%m-%d")
+        if den not in st.session_state.rezervace_data:
+            st.session_state.rezervace_data[den] = True  # True = volno
 
     st.subheader(f"Dostupné dny v {mesic}")
 
-    rok, mesic_c = map(int, mesic.split("-"))
-    _, pocet_dni_mesice = calendar.monthrange(rok, mesic_c)
-    dny_mesice = [datetime(rok, mesic_c, i+1).strftime("%Y-%m-%d") for i in range(pocet_dni_mesice)]
+    # Rozdělení dnů do týdnů
+    dny_mesice = [datetime(rok, mesic_c, i+1).strftime("%Y-%m-%d") for i in range(pocet_dni)]
     weeks = [dny_mesice[i:i+7] for i in range(0, len(dny_mesice), 7)]
     vybrane_dny = []
 
@@ -64,11 +65,13 @@ with st.form("rezervace_form"):
             den_date = datetime.strptime(den_str, "%Y-%m-%d")
             weekday = calendar.day_name[den_date.weekday()][:3]
             label = f"{den_date.day} ({weekday})"
-            if st.session_state.rezervace_data[den_str]["volno"]:
+
+            # Volno / obsazeno
+            if st.session_state.rezervace_data[den_str]:
                 if cols[idx].checkbox(label, key=den_str):
                     vybrane_dny.append(den_str)
             else:
-                cols[idx].write(f"❌ {den_date.day}")
+                cols[idx].markdown(f"<span style='color:red'>❌ {den_date.day}</span>", unsafe_allow_html=True)
 
     st.markdown("---")
     st.checkbox(
@@ -94,6 +97,10 @@ with st.form("rezervace_form"):
             for e in errors:
                 st.error(e)
         else:
+            # Označíme vybrané dny jako obsazené
+            for den in vybrane_dny:
+                st.session_state.rezervace_data[den] = False
+
             st.success("Rezervace byla úspěšně odeslána!")
             st.write("Vybrané dny:", vybrane_dny)
             st.write("Osoba 1:", j1, n1, a1, d1)
