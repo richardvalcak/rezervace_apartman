@@ -1,60 +1,46 @@
 import streamlit as st
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta
 import requests
 from icalendar import Calendar
+from io import BytesIO
 
-st.set_page_config(page_title="Rezervace Apartmánu", layout="centered")
-
-st.title("Rezervační kalendář – Apartmán Tyršova")
-
-# --- iCal feed z Booking.com ---
-ICAL_URL = "TVŮJ_ICAL_FEED_URL"
+ICAL_URL = "https://ical.booking.com/v1/export?t=641d7a68-4a90-4d73-b223-2668d2d33476"
 
 # --- Načtení obsazených dní z iCal ---
-def get_obsazene_dny(url):
+def nacti_obsazene():
+    obsazene = set()
     try:
-        resp = requests.get(url)
-        cal = Calendar.from_ical(resp.content)
-        obsazene = set()
+        response = requests.get(ICAL_URL)
+        cal = Calendar.from_ical(response.content)
         for event in cal.walk('VEVENT'):
             start = event.get('dtstart').dt
             end = event.get('dtend').dt
-            # převést na date pokud je datetime
+            # Převod na date (pro bezpečí, pokud je datetime)
             if isinstance(start, datetime):
                 start = start.date()
             if isinstance(end, datetime):
                 end = end.date()
-            delta = (end - start).days
-            for i in range(delta):
-                obsazene.add((start + timedelta(days=i)).strftime("%Y-%m-%d"))
-        return obsazene
+            # Přidáme všechny dny v rozsahu do setu
+            den = start
+            while den < end:
+                obsazene.add(den)
+                den += timedelta(days=1)
     except Exception as e:
         st.error(f"Chyba načítání iCal: {e}")
-        return set()
+    return obsazene
 
-if "obsazene_dny" not in st.session_state:
-    st.session_state.obsazene_dny = get_obsazene_dny(ICAL_URL)
+obsazene_dny = nacti_obsazene()
 
-# --- Výběr období ---
-st.subheader("Vyberte období pobytu")
-start_date = st.date_input("Od:", min_value=date.today())
-end_date = st.date_input("Do:", min_value=start_date)
+# --- Zobrazení kalendáře ---
+st.title("Rezervace Apartmán Tyršova")
+dnes = datetime.today().date()
+vyber = st.date_input(
+    "Vyberte den pobytu",
+    min_value=dnes,
+    value=dnes
+)
 
-# --- Kontrola dostupnosti ---
-selected_range = [start_date + timedelta(days=i) for i in range((end_date - start_date).days + 1)]
-conflict = [d for d in selected_range if d.strftime("%Y-%m-%d") in st.session_state.obsazene_dny]
-
-if conflict:
-    st.error(f"Některé dny jsou již obsazené: {', '.join([d.strftime('%d.%m.%Y') for d in conflict])}")
-    vyber_ok = False
+if vyber in obsazene_dny:
+    st.warning("Tento den je již obsazen.")
 else:
-    vyber_ok = True
-
-# --- Tlačítko potvrzení ---
-if st.button("Rezervovat"):
-    if vyber_ok:
-        for d in selected_range:
-            st.session_state.obsazene_dny.add(d.strftime("%Y-%m-%d"))
-        st.success(f"Rezervace potvrzena od {start_date} do {end_date}")
-    else:
-        st.warning("Vyberte jiné volné dny.")
+    st.success(f"Den {vyber} je volný!")
