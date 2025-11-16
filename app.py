@@ -1,40 +1,101 @@
+# app.py – Rezervační systém | Apartmán Tyršova | 2025
 import streamlit as st
-from datetime import datetime
+from datetime import datetime, timedelta
 import calendar
 
-# Příklad měsíce – může být nahrazen výběrem uživatele
-dnes = datetime.today()
-mesic = st.selectbox("Vyberte měsíc", [dnes.strftime("%Y-%m"), (dnes.replace(day=1) + timedelta(days=30)).strftime("%Y-%m")])
+st.set_page_config(page_title="Rezervace – Apartmán Tyršova", layout="centered")
 
-# Inicializace dat pro demo
-if "rezervace_data" not in st.session_state:
-    st.session_state.rezervace_data = {}
+st.title("Kniha hostů")
+
+st.markdown("""
+Prosíme vás o vyplnění této knihy hostů.  
+Vyplněním formuláře nám pomáháte splnit zákonem stanovené povinnosti vedení evidence ubytovaných osob a platby místního poplatku z pobytu.  
+Vaše údaje jsou uchovávány v souladu s platnými právními předpisy a slouží výhradně k evidenci pobytu.  
+**Apartmán Tyršova, Tyršova 1239/1, 669 02 Znojmo**
+""")
+
+# === Formulář ===
+with st.form("rezervace_form"):
+
+    pocet_osob = st.selectbox("Počet osob *", [1, 2], index=0)
+
+    st.subheader("1. Osoba")
+    j1 = st.text_input("Jméno a příjmení *", placeholder="Jan Novák")
+    n1 = st.text_input("Datum narození *", placeholder="15. 6. 1985")
+    a1 = st.text_input("Adresa *", placeholder="Hlavní 123, Brno")
+    d1 = st.text_input("Doklad *", placeholder="123456789 (OP)")
+
+    if pocet_osob == 2:
+        st.subheader("2. Osoba")
+        j2 = st.text_input("Jméno a příjmení *", placeholder="Marie Nováková", key="j2")
+        n2 = st.text_input("Datum narození *", placeholder="20. 8. 1990", key="n2")
+        a2 = st.text_input("Adresa *", placeholder="Hlavní 123, Brno", key="a2")
+        d2 = st.text_input("Doklad *", placeholder="987654321 (OP)", key="d2")
+
+    st.markdown("---")
+    st.subheader("Výběr dne pobytu")
+    
+    dnes = datetime.today()
+    mesic = st.selectbox(
+        "Vyberte měsíc",
+        [dnes.strftime("%Y-%m"), (dnes.replace(day=1) + timedelta(days=30)).strftime("%Y-%m")]
+    )
+
+    # Inicializace dat – volné dny (demo)
+    if "rezervace_data" not in st.session_state:
+        st.session_state.rezervace_data = {}
+        rok, mesic_c = map(int, mesic.split("-"))
+        _, pocet_dni = calendar.monthrange(rok, mesic_c)
+        for d in range(1, pocet_dni + 1):
+            den = datetime(rok, mesic_c, d).strftime("%Y-%m-%d")
+            st.session_state.rezervace_data[den] = {"volno": True, "cena": 1000}
+
+    st.subheader(f"Dostupné dny v {mesic}")
+
     rok, mesic_c = map(int, mesic.split("-"))
-    _, pocet_dni = calendar.monthrange(rok, mesic_c)
-    for d in range(1, pocet_dni + 1):
-        den = datetime(rok, mesic_c, d).strftime("%Y-%m-%d")
-        st.session_state.rezervace_data[den] = {"volno": True, "cena": 1000}
+    _, pocet_dni_mesice = calendar.monthrange(rok, mesic_c)
+    dny_mesice = [datetime(rok, mesic_c, i+1).strftime("%Y-%m-%d") for i in range(pocet_dni_mesice)]
+    weeks = [dny_mesice[i:i+7] for i in range(0, len(dny_mesice), 7)]
+    vybrane_dny = []
 
-# === Kalendář ===
-st.subheader(f"Dostupné dny v {mesic}")
+    for week in weeks:
+        cols = st.columns(7)
+        for idx, den_str in enumerate(week):
+            den_date = datetime.strptime(den_str, "%Y-%m-%d")
+            weekday = calendar.day_name[den_date.weekday()][:3]
+            label = f"{den_date.day} ({weekday})"
+            if st.session_state.rezervace_data[den_str]["volno"]:
+                if cols[idx].checkbox(label, key=den_str):
+                    vybrane_dny.append(den_str)
+            else:
+                cols[idx].write(f"❌ {den_date.day}")
 
-rok, mesic_c = map(int, mesic.split("-"))
-prvni_den_mesice, pocet_dni_mesice = calendar.monthrange(rok, mesic_c)
+    st.markdown("---")
+    st.checkbox(
+        "**Souhlasím se zpracováním osobních údajů podle výše uvedeného textu**",
+        key="souhlas"
+    )
 
-dny_mesice = [datetime(rok, mesic_c, i+1).strftime("%Y-%m-%d") for i in range(pocet_dni_mesice)]
-weeks = [dny_mesice[i:i+7] for i in range(0, len(dny_mesice), 7)]
-vybrane_dny_host = []
+    submitted = st.form_submit_button("ODESLAT REZERVACI")
 
-for week in weeks:
-    cols = st.columns(7)
-    for idx, den_str in enumerate(week):
-        den_date = datetime.strptime(den_str, "%Y-%m-%d")
-        weekday = calendar.day_name[den_date.weekday()][:3]
-        label = f"{den_date.day} ({weekday})"
-        if st.session_state.rezervace_data[den_str]["volno"]:
-            if cols[idx].checkbox(label, key=den_str):
-                vybrane_dny_host.append(den_str)
+    if submitted:
+        errors = []
+        if not j1.strip() or not n1.strip() or not a1.strip() or not d1.strip():
+            errors.append("Vyplňte všechna povinná pole 1. osoby.")
+        if pocet_osob == 2:
+            if not j2.strip() or not n2.strip() or not a2.strip() or not d2.strip():
+                errors.append("Vyplňte všechna povinná pole 2. osoby.")
+        if not vybrane_dny:
+            errors.append("Vyberte alespoň jeden den pobytu.")
+        if not st.session_state.get("souhlas", False):
+            errors.append("Souhlas je povinný.")
+
+        if errors:
+            for e in errors:
+                st.error(e)
         else:
-            cols[idx].write(f"❌ {den_date.day}")
-
-st.write("Vybrané dny:", vybrane_dny_host)
+            st.success("Rezervace byla úspěšně odeslána!")
+            st.write("Vybrané dny:", vybrane_dny)
+            st.write("Osoba 1:", j1, n1, a1, d1)
+            if pocet_osob == 2:
+                st.write("Osoba 2:", j2, n2, a2, d2)
