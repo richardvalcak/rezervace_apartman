@@ -1,72 +1,69 @@
+# app.py
 import streamlit as st
-from datetime import date, timedelta
+from datetime import datetime, timedelta
 import calendar
-import requests
-from icalendar import Calendar
-from io import BytesIO
 
 st.set_page_config(page_title="Dostupnost Apartmánu", layout="wide")
 
-# --- iCal URL z Booking ---
-ical_url = "https://ical.booking.com/v1/export?t=641d7a68-4a90-4d73-b223-2668d2d33476"
-
-# --- Načtení obsazených dnů z iCal ---
-def get_obsazene_dny(url):
-    try:
-        r = requests.get(url)
-        r.raise_for_status()
-        cal = Calendar.from_ical(r.content)
-        obsazene = set()
-        for component in cal.walk():
-            if component.name == "VEVENT":
-                start = component.get('dtstart').dt
-                end = component.get('dtend').dt
-                if isinstance(start, date) and isinstance(end, date):
-                    delta = (end - start).days
-                    for i in range(delta):
-                        obsazene.add(start + timedelta(days=i))
-        return obsazene
-    except:
-        st.error("Nepodařilo se načíst iCal.")
-        return set()
-
-obsazene_dny = get_obsazene_dny(ical_url)
-
-# --- Zobrazení měsíce ---
-def zobraz_mesic(year, month):
-    st.markdown(f"### {calendar.month_name[month]} {year}")
-    dni_tydne = ["Po","Út","St","Čt","Pá","So","Ne"]
-    cols = st.columns(7)
-    for i,d in enumerate(dni_tydne):
-        cols[i].markdown(f"**{d}**")
-    
-    cal = calendar.Calendar(firstweekday=0)
-    days = list(cal.itermonthdates(year, month))
-    
-    rows = []
-    for i in range(0, len(days), 7):
-        rows.append(days[i:i+7])
-    
-    for tyd in rows:
-        cols = st.columns(7)
-        for i, den in enumerate(tyd):
-            if den.month != month:
-                cols[i].markdown(" ")
-                continue
-            color = "#d4edda" if den not in obsazene_dny else "#f8d7da"
-            cols[i].markdown(
-                f"<div style='background-color:{color}; text-align:center; padding:4px; border-radius:4px;'>{den.day}</div>",
-                unsafe_allow_html=True
-            )
-
-# --- Zobrazení aktuálního a dvou dalších měsíců ---
-dnes = date.today()
-for m in range(3):
-    mesic = (dnes.replace(day=1) + timedelta(days=32*m)).replace(day=1)
-    zobraz_mesic(mesic.year, mesic.month)
+st.title("Kniha hostů – Dostupnost Apartmánu Tyršova")
 
 st.markdown("""
-**Legenda:**  
-<div style='display:inline-block; width:20px; height:20px; background-color:#d4edda; border:1px solid #ccc; margin-right:5px;'></div> Volné  
-<div style='display:inline-block; width:20px; height:20px; background-color:#f8d7da; border:1px solid #ccc; margin-right:5px;'></div> Obsazené
-""", unsafe_allow_html=True)
+Prosíme vás o vyplnění této knihy hostů.  
+Vyplněním formuláře nám pomáháte splnit zákonem stanovené povinnosti vedení evidence ubytovaných osob a platby místního poplatku z pobytu.  
+Vaše údaje jsou uchovávány v souladu s platnými právními předpisy a slouží výhradně k evidenci pobytu.  
+**Apartmán Tyršova, Tyršova 1239/1, 669 02 Znojmo**
+""")
+
+# === Nastavení dostupnosti ===
+# obsazené dny – např. z iCal nebo databáze
+obsazene_dny = [
+    datetime.today() + timedelta(days=1),
+    datetime.today() + timedelta(days=3),
+    datetime.today() + timedelta(days=7)
+]
+
+# počet měsíců k zobrazení
+pocet_mesicu = 2
+dnes = datetime.today()
+
+def zobraz_kalendar(start_date, months=2):
+    for m in range(months):
+        rok = (start_date.replace(day=1) + timedelta(days=30*m)).year
+        mesic = (start_date.replace(day=1) + timedelta(days=30*m)).month
+        cal = calendar.Calendar(firstweekday=0)  # pondělí
+        dni_mesice = list(cal.itermonthdates(rok, mesic))
+
+        st.markdown(f"### {calendar.month_name[mesic]} {rok}")
+        # vytvoření mřížky dnů
+        cols = st.columns(7)
+        # hlavička týdnů
+        for i, day_name in enumerate(['Po','Út','St','Čt','Pá','So','Ne']):
+            cols[i].markdown(f"**{day_name}**", unsafe_allow_html=True)
+
+        # dny
+        col_index = 0
+        cols = st.columns(7)
+        for den in dni_mesice:
+            if den.month != mesic:
+                # dny mimo měsíc
+                cols[col_index].markdown(" ", unsafe_allow_html=True)
+            else:
+                datum_str = den.strftime("%Y-%m-%d")
+                if den in obsazene_dny:
+                    # červené = obsazeno
+                    cols[col_index].markdown(f"<div style='background-color:#f28b82; color:white; padding:8px; border-radius:5px; text-align:center;' title='{datum_str}'>{den.day}</div>", unsafe_allow_html=True)
+                else:
+                    # zelené = volno
+                    cols[col_index].markdown(f"<div style='background-color:#81c995; color:white; padding:8px; border-radius:5px; text-align:center;' title='{datum_str}'>{den.day}</div>", unsafe_allow_html=True)
+            col_index += 1
+            if col_index == 7:
+                col_index = 0
+                cols = st.columns(7)
+
+zobraz_kalendar(dnes, months=pocet_mesicu)
+
+st.markdown("""
+#### Poznámka pro zákazníky:
+Zelené dny jsou volné, červené dny jsou již obsazené.  
+Po výběru termínu vás budeme kontaktovat s cenou a potvrzením rezervace.
+""")
