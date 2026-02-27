@@ -1,0 +1,27 @@
+name: Wake Streamlit Apps (Selenium)
+
+on:
+  schedule:
+    - cron: '0 */4 * * *'           # každé 4 hodiny (00, 04, 08, 12, 16, 20 UTC)
+  workflow_dispatch:                # pro ruční test
+
+jobs:
+  wake-up:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Selenium + Chrome driver
+        run: |
+          python -m pip install --upgrade pip
+          pip install selenium webdriver-manager
+
+      - name: Run wake script
+        run: python wake_streamlit.py     # ← změň na jméno tvého .py souboru !!!
