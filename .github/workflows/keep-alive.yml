@@ -1,0 +1,29 @@
+name: Keep Streamlit App Awake
+
+on:
+  schedule:
+    - cron: '0 */8 * * *'           # každých 8 hodin (0., 8., 16., 00:00 UTC)
+  workflow_dispatch:                # umožní ruční spuštění z GitHubu
+
+permissions:
+  contents: write                     # nutné pro push
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0                # potřebujeme historii
+
+      - name: Configure git user
+        run: |
+          git config --global user.name "Keep-Alive Bot"
+          git config --global user.email "keepalive@github.local"
+
+      - name: Create empty commit & push
+        run: |
+          git commit --allow-empty -m "Keep-alive commit $(date -u +'%Y-%m-%d %H:%M UTC')"
+          git push origin HEAD
