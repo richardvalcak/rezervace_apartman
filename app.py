@@ -73,4 +73,4 @@ def zobraz_kalendar(start_date, months=3):  # změněno na 3 měsíce
         st.markdown(table_html, unsafe_allow_html=True)
 
 # zobrazit kalendář 3 měsíce od dneška
-zobraz_kalendar(datetime.today(), months=3)
+zobraz_kalendar(datetime.today(), months=6)
