@@ -17,6 +17,14 @@ SMTP_USER = st.secrets.get("SMTP_USER", "info@apartmantyrsova.cz")
 SMTP_PASS = st.secrets.get("SMTP_PASS", "")
 NOTIFY_EMAIL = st.secrets.get("NOTIFY_EMAIL", "info@apartmantyrsova.cz")
 
+# ── DEBUG PANEL ───────────────────────────────────────────────────────────────
+st.sidebar.markdown("### Debug info")
+st.sidebar.write("SMTP_HOST:", SMTP_HOST)
+st.sidebar.write("SMTP_PORT:", SMTP_PORT)
+st.sidebar.write("SMTP_USER:", SMTP_USER)
+st.sidebar.write("SMTP_PASS nastaveno:", bool(SMTP_PASS))
+st.sidebar.write("NOTIFY_EMAIL:", NOTIFY_EMAIL)
+
 # ── OBSAZENÉ DNY ──────────────────────────────────────────────────────────────
 @st.cache_data(ttl=900)
 def nacti_obsazene_dny():
@@ -134,7 +142,7 @@ with col2:
             for ch in st.session_state.chyby:
                 st.error(ch)
         if st.session_state.email_chyba:
-            st.error(f"Chyba při odesílání emailu: {st.session_state.email_chyba}")
+            st.error(f"Chyba: {st.session_state.email_chyba}")
             st.info("Kontaktujte nás přímo: info@apartmantyrsova.cz")
 
         dnes = date.today()
