@@ -9,7 +9,6 @@ from email.mime.multipart import MIMEMultipart
 
 st.set_page_config(page_title="Rezervace Apartmánu Tyršova", layout="wide")
 
-# ── KONFIGURACE ───────────────────────────────────────────────────────────────
 ICAL_URL = "https://ical.booking.com/v1/export?t=641d7a68-4a90-4d73-b223-2668d2d33476"
 SMTP_HOST = st.secrets.get("SMTP_HOST", "smtp.wedos.net")
 SMTP_PORT = int(st.secrets.get("SMTP_PORT", 465))
@@ -17,15 +16,6 @@ SMTP_USER = st.secrets.get("SMTP_USER", "info@apartmantyrsova.cz")
 SMTP_PASS = st.secrets.get("SMTP_PASS", "")
 NOTIFY_EMAIL = st.secrets.get("NOTIFY_EMAIL", "info@apartmantyrsova.cz")
 
-# ── DEBUG PANEL ───────────────────────────────────────────────────────────────
-st.sidebar.markdown("### Debug info")
-st.sidebar.write("SMTP_HOST:", SMTP_HOST)
-st.sidebar.write("SMTP_PORT:", SMTP_PORT)
-st.sidebar.write("SMTP_USER:", SMTP_USER)
-st.sidebar.write("SMTP_PASS nastaveno:", bool(SMTP_PASS))
-st.sidebar.write("NOTIFY_EMAIL:", NOTIFY_EMAIL)
-
-# ── OBSAZENÉ DNY ──────────────────────────────────────────────────────────────
 @st.cache_data(ttl=900)
 def nacti_obsazene_dny():
     obsazene = set()
@@ -45,7 +35,7 @@ def nacti_obsazene_dny():
                     obsazene.add(current)
                     current += timedelta(days=1)
     except Exception as e:
-        st.warning(f"Nepodařilo se načíst obsazenost z Booking.com: {e}")
+        st.warning(f"Nepodařilo se načíst obsazenost: {e}")
     return obsazene
 
 if "lokalni_rezervace" not in st.session_state:
@@ -54,14 +44,13 @@ if "lokalni_rezervace" not in st.session_state:
 def vsechny_obsazene():
     return nacti_obsazene_dny() | st.session_state.lokalni_rezervace
 
-# ── EMAIL ─────────────────────────────────────────────────────────────────────
 def posli_email(jmeno, email_hosta, telefon, prijezd, odjezd, pocet_osob, zprava):
     if not SMTP_PASS:
-        return False, "SMTP heslo není nastaveno v secrets"
+        return False, "SMTP heslo není nastaveno"
     try:
         pocet_noci = (odjezd - prijezd).days
         msg = MIMEMultipart("alternative")
-        msg["Subject"] = f"Nova poptavka - {prijezd.strftime('%d. %m. %Y')} az {odjezd.strftime('%d. %m. %Y')}"
+        msg["Subject"] = f"Nova poptavka - {prijezd.strftime('%d.%m.%Y')} az {odjezd.strftime('%d.%m.%Y')}"
         msg["From"] = SMTP_USER
         msg["To"] = NOTIFY_EMAIL
         text = f"Jmeno: {jmeno}\nEmail: {email_hosta}\nTelefon: {telefon}\nPrijezd: {prijezd}\nOdjezd: {odjezd}\nNoci: {pocet_noci}\nOsob: {pocet_osob}\nZprava: {zprava}"
@@ -73,7 +62,6 @@ def posli_email(jmeno, email_hosta, telefon, prijezd, odjezd, pocet_osob, zprava
     except Exception as e:
         return False, str(e)
 
-# ── KALENDÁR ──────────────────────────────────────────────────────────────────
 dny_tydne_cz = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne']
 mesice_cz = ["","leden","únor","březen","duben","květen","červen",
              "červenec","srpen","září","říjen","listopad","prosinec"]
@@ -103,14 +91,6 @@ def zobraz_kalendar(obsazene, start_date, months=6):
         table_html += "</table>"
         st.markdown(table_html, unsafe_allow_html=True)
 
-# ── SESSION STATE ─────────────────────────────────────────────────────────────
-for k, v in [("form_jmeno",""),("form_email",""),("form_telefon",""),
-             ("form_zprava",""),("form_pocet",2),("odeslano",False),
-             ("chyby",[]),("email_chyba","")]:
-    if k not in st.session_state:
-        st.session_state[k] = v
-
-# ── LAYOUT ────────────────────────────────────────────────────────────────────
 st.title("Apartmán Tyršova – Znojmo")
 st.markdown("**Přímá rezervace bez poplatků**")
 
@@ -132,47 +112,29 @@ with col2:
     st.subheader("Poptávka rezervace")
     st.info("Vyplňte formulář a ozveme se vám do 24 hodin s potvrzením a platebními údaji.")
 
-    if st.session_state.odeslano:
+    if st.session_state.get("odeslano"):
         st.success("Poptávka odeslána! Brzy se vám ozveme s potvrzením a platebními údaji.")
         if st.button("Nová rezervace"):
             st.session_state.odeslano = False
             st.rerun()
     else:
-        if st.session_state.chyby:
-            for ch in st.session_state.chyby:
-                st.error(ch)
-        if st.session_state.email_chyba:
-            st.error(f"Chyba: {st.session_state.email_chyba}")
-            st.info("Kontaktujte nás přímo: info@apartmantyrsova.cz")
-
         dnes = date.today()
-        with st.form("rezervace_form", clear_on_submit=False):
-            jmeno = st.text_input("Jméno a příjmení *", value=st.session_state.form_jmeno)
-            email_hosta = st.text_input("Email *", value=st.session_state.form_email)
-            telefon = st.text_input("Telefon *", value=st.session_state.form_telefon)
-            prijezd = st.date_input("Datum příjezdu *",
-                                     value=dnes + timedelta(days=7),
-                                     min_value=dnes,
-                                     format="DD/MM/YYYY")
-            odjezd = st.date_input("Datum odjezdu *",
-                                    value=dnes + timedelta(days=10),
-                                    min_value=dnes + timedelta(days=1),
-                                    format="DD/MM/YYYY")
-            pocet_osob = st.selectbox("Počet osob *", [1, 2],
-                                       index=min(st.session_state.form_pocet - 1, 1))
-            zprava = st.text_area("Zpráva / dotaz (nepovinné)",
-                                   value=st.session_state.form_zprava, height=80)
-            odeslat = st.form_submit_button("Odeslat poptávku", type="primary", use_container_width=True)
 
-        if odeslat:
-            st.session_state.form_jmeno = jmeno
-            st.session_state.form_email = email_hosta
-            st.session_state.form_telefon = telefon
-            st.session_state.form_zprava = zprava
-            st.session_state.form_pocet = pocet_osob
-            st.session_state.chyby = []
-            st.session_state.email_chyba = ""
+        jmeno = st.text_input("Jméno a příjmení *")
+        email_hosta = st.text_input("Email *")
+        telefon = st.text_input("Telefon *")
+        prijezd = st.date_input("Datum příjezdu *",
+                                 value=dnes + timedelta(days=7),
+                                 min_value=dnes,
+                                 format="DD/MM/YYYY")
+        odjezd = st.date_input("Datum odjezdu *",
+                                value=dnes + timedelta(days=10),
+                                min_value=dnes + timedelta(days=1),
+                                format="DD/MM/YYYY")
+        pocet_osob = st.selectbox("Počet osob *", [1, 2])
+        zprava = st.text_area("Zpráva / dotaz (nepovinné)", height=80)
 
+        if st.button("Odeslat poptávku", type="primary", use_container_width=True):
             chyby = []
             if not jmeno:
                 chyby.append("Jméno je povinné")
@@ -193,8 +155,8 @@ with col2:
                 chyby.append(f"Termín není volný – obsazené dny: {', '.join(konflikt)}")
 
             if chyby:
-                st.session_state.chyby = chyby
-                st.rerun()
+                for ch in chyby:
+                    st.error(ch)
             else:
                 ok, msg = posli_email(jmeno, email_hosta, telefon, prijezd, odjezd, pocet_osob, zprava)
                 if ok:
@@ -202,13 +164,7 @@ with col2:
                     while current < odjezd:
                         st.session_state.lokalni_rezervace.add(current)
                         current += timedelta(days=1)
-                    st.session_state.form_jmeno = ""
-                    st.session_state.form_email = ""
-                    st.session_state.form_telefon = ""
-                    st.session_state.form_zprava = ""
-                    st.session_state.form_pocet = 2
                     st.session_state.odeslano = True
                     st.rerun()
                 else:
-                    st.session_state.email_chyba = msg
-                    st.rerun()
+                    st.error(f"Chyba při odesílání emailu: {msg}")
