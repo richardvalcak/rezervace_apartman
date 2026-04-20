@@ -182,6 +182,8 @@ with col2:
 
     dnes = date.today()
 
+    zpravy = st.empty()
+
     with st.form("rezervace_form", clear_on_submit=False):
         jmeno = st.text_input("Jméno a příjmení *", value=st.session_state.form_jmeno)
         email_hosta = st.text_input("Email *", value=st.session_state.form_email)
@@ -231,16 +233,16 @@ with col2:
             chyby.append(f"Termín není volný – obsazené dny: {', '.join(konflikt)}")
 
         if chyby:
-            for ch in chyby:
-                st.error(ch)
+            with zpravy.container():
+                for ch in chyby:
+                    st.error(ch)
         else:
             ok, msg = posli_email(jmeno, email_hosta, telefon, prijezd, odjezd, pocet_osob, zprava)
             if ok:
-                st.success(f"""
-                ✅ Poptávka odeslána!
-
-                Brzy se vám ozveme na **{email_hosta}** s potvrzením dostupnosti a platebními údaji.
-                """)
+                with zpravy.container():
+                    st.success(f"""
+                    Poptávka odeslána! Brzy se vám ozveme na **{email_hosta}** s potvrzením dostupnosti a platebními údaji.
+                    """)
                 # zablokuj dny lokálně do reloadu
                 current = prijezd
                 while current < odjezd:
@@ -254,5 +256,6 @@ with col2:
                 st.session_state.form_pocet = 2
                 st.rerun()
             else:
-                st.error(f"Chyba při odesílání emailu: {msg}")
-                st.info("Kontaktujte nás přímo: info@apartmantyrsova.cz")
+                with zpravy.container():
+                    st.error(f"Chyba při odesílání emailu: {msg}")
+                    st.info("Kontaktujte nás přímo: info@apartmantyrsova.cz")
