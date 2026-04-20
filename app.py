@@ -168,24 +168,46 @@ with col2:
     st.subheader("Poptávka rezervace")
     st.info("Vyplňte formulář a ozveme se vám do 24 hodin s potvrzením a platebními údaji.")
 
-    with st.form("rezervace_form", clear_on_submit=True):
-        jmeno = st.text_input("Jméno a příjmení *")
-        email_hosta = st.text_input("Email *")
-        telefon = st.text_input("Telefon *")
+    # session state pro zachování hodnot při chybě
+    if "form_jmeno" not in st.session_state:
+        st.session_state.form_jmeno = ""
+    if "form_email" not in st.session_state:
+        st.session_state.form_email = ""
+    if "form_telefon" not in st.session_state:
+        st.session_state.form_telefon = ""
+    if "form_zprava" not in st.session_state:
+        st.session_state.form_zprava = ""
+    if "form_pocet" not in st.session_state:
+        st.session_state.form_pocet = 2
 
-        dnes = date.today()
-        prijezd = st.date_input("Datum příjezdu *", 
+    dnes = date.today()
+
+    with st.form("rezervace_form", clear_on_submit=False):
+        jmeno = st.text_input("Jméno a příjmení *", value=st.session_state.form_jmeno)
+        email_hosta = st.text_input("Email *", value=st.session_state.form_email)
+        telefon = st.text_input("Telefon *", value=st.session_state.form_telefon)
+
+        prijezd = st.date_input("Datum příjezdu *",
                                  value=dnes + timedelta(days=7),
-                                 min_value=dnes)
-        odjezd = st.date_input("Datum odjezdu *", 
+                                 min_value=dnes,
+                                 format="DD/MM/YYYY")
+        odjezd = st.date_input("Datum odjezdu *",
                                 value=dnes + timedelta(days=10),
-                                min_value=dnes + timedelta(days=1))
-        pocet_osob = st.selectbox("Počet osob *", [1, 2, 3, 4])
-        zprava = st.text_area("Zpráva / dotaz (nepovinné)", height=80)
+                                min_value=dnes + timedelta(days=1),
+                                format="DD/MM/YYYY")
+        pocet_osob = st.selectbox("Počet osob *", [1, 2],
+                                   index=min(st.session_state.form_pocet - 1, 1))
+        zprava = st.text_area("Zpráva / dotaz (nepovinné)", value=st.session_state.form_zprava, height=80)
 
         odeslat = st.form_submit_button("Odeslat poptávku", type="primary", use_container_width=True)
 
     if odeslat:
+        # ulož hodnoty do session state
+        st.session_state.form_jmeno = jmeno
+        st.session_state.form_email = email_hosta
+        st.session_state.form_telefon = telefon
+        st.session_state.form_zprava = zprava
+        st.session_state.form_pocet = pocet_osob
         # validace
         chyby = []
         if not jmeno:
@@ -224,6 +246,12 @@ with col2:
                 while current < odjezd:
                     st.session_state.lokalni_rezervace.add(current)
                     current += timedelta(days=1)
+                # vymaž formulář po úspěchu
+                st.session_state.form_jmeno = ""
+                st.session_state.form_email = ""
+                st.session_state.form_telefon = ""
+                st.session_state.form_zprava = ""
+                st.session_state.form_pocet = 2
                 st.rerun()
             else:
                 st.error(f"Chyba při odesílání emailu: {msg}")
