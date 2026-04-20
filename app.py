@@ -11,7 +11,7 @@ st.set_page_config(page_title="Rezervace Apartmánu Tyršova", layout="wide")
 
 # ── KONFIGURACE ───────────────────────────────────────────────────────────────
 ICAL_URL = "https://ical.booking.com/v1/export?t=641d7a68-4a90-4d73-b223-2668d2d33476"
-SMTP_HOST = st.secrets.get("SMTP_HOST", "mail.apartmantyrsova.cz")
+SMTP_HOST = st.secrets.get("SMTP_HOST", "smtp.wedos.net")
 SMTP_PORT = int(st.secrets.get("SMTP_PORT", 465))
 SMTP_USER = st.secrets.get("SMTP_USER", "info@apartmantyrsova.cz")
 SMTP_PASS = st.secrets.get("SMTP_PASS", "")
@@ -48,21 +48,16 @@ def vsechny_obsazene():
 
 # ── EMAIL ─────────────────────────────────────────────────────────────────────
 def posli_email(jmeno, email_hosta, telefon, prijezd, odjezd, pocet_osob, zprava):
-    # DEBUG rezim - odstran az bude SMTP funkcni
-    return True, "OK"
-
     if not SMTP_PASS:
         return False, "SMTP heslo není nastaveno v secrets"
     try:
         pocet_noci = (odjezd - prijezd).days
         msg = MIMEMultipart("alternative")
-        msg["Subject"] = f"Nova poptavka rezervace - {prijezd.strftime('%d. %m. %Y')} az {odjezd.strftime('%d. %m. %Y')}"
+        msg["Subject"] = f"Nova poptavka - {prijezd.strftime('%d. %m. %Y')} az {odjezd.strftime('%d. %m. %Y')}"
         msg["From"] = SMTP_USER
         msg["To"] = NOTIFY_EMAIL
-        text = f"Jmeno: {jmeno}\nEmail: {email_hosta}\nTelefon: {telefon}\nPrijezd: {prijezd.strftime('%d. %m. %Y')}\nOdjezd: {odjezd.strftime('%d. %m. %Y')}\nNoci: {pocet_noci}\nOsob: {pocet_osob}\nZprava: {zprava}"
-        html = f"<html><body><h2>Nova poptavka rezervace</h2><p>Jmeno: {jmeno}</p><p>Email: <a href='mailto:{email_hosta}'>{email_hosta}</a></p><p>Telefon: {telefon}</p><p>Prijezd: {prijezd.strftime('%d. %m. %Y')}</p><p>Odjezd: {odjezd.strftime('%d. %m. %Y')}</p><p>Noci: {pocet_noci}</p><p>Osob: {pocet_osob}</p><p>Zprava: {zprava if zprava else '-'}</p></body></html>"
+        text = f"Jmeno: {jmeno}\nEmail: {email_hosta}\nTelefon: {telefon}\nPrijezd: {prijezd}\nOdjezd: {odjezd}\nNoci: {pocet_noci}\nOsob: {pocet_osob}\nZprava: {zprava}"
         msg.attach(MIMEText(text, "plain", "utf-8"))
-        msg.attach(MIMEText(html, "html", "utf-8"))
         with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT) as server:
             server.login(SMTP_USER, SMTP_PASS)
             server.sendmail(SMTP_USER, NOTIFY_EMAIL, msg.as_string())
@@ -70,11 +65,10 @@ def posli_email(jmeno, email_hosta, telefon, prijezd, odjezd, pocet_osob, zprava
     except Exception as e:
         return False, str(e)
 
-# ── KALENDAR ──────────────────────────────────────────────────────────────────
-dny_tydne = ['Po', 'Ut', 'St', 'Ct', 'Pa', 'So', 'Ne']
+# ── KALENDÁR ──────────────────────────────────────────────────────────────────
 dny_tydne_cz = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne']
-mesice_cz = ["","leden","unor","brezen","duben","kveten","cerven","cervenec","srpen","zari","rijen","listopad","prosinec"]
-mesice_cz = ["","leden","únor","březen","duben","květen","červen","červenec","srpen","září","říjen","listopad","prosinec"]
+mesice_cz = ["","leden","únor","březen","duben","květen","červen",
+             "červenec","srpen","září","říjen","listopad","prosinec"]
 
 def zobraz_kalendar(obsazene, start_date, months=6):
     for m in range(months):
@@ -131,7 +125,7 @@ with col2:
     st.info("Vyplňte formulář a ozveme se vám do 24 hodin s potvrzením a platebními údaji.")
 
     if st.session_state.odeslano:
-        st.success("✅ Poptávka odeslána! Brzy se vám ozveme s potvrzením a platebními údaji.")
+        st.success("Poptávka odeslána! Brzy se vám ozveme s potvrzením a platebními údaji.")
         if st.button("Nová rezervace"):
             st.session_state.odeslano = False
             st.rerun()
