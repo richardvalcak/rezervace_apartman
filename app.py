@@ -1,6 +1,6 @@
 import streamlit as st
 from datetime import datetime, timedelta, date
-import calendar
+import calendar 
 import requests
 from icalendar import Calendar
 import smtplib
