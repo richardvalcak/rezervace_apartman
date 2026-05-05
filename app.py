@@ -3,18 +3,14 @@ from datetime import datetime, timedelta, date
 import calendar 
 import requests
 from icalendar import Calendar
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import sendgrid
+from sendgrid.helpers.mail import Mail
 
 st.set_page_config(page_title="Rezervace Apartmánu Tyršova", layout="wide")
 
 ICAL_URL = "https://ical.booking.com/v1/export?t=641d7a68-4a90-4d73-b223-2668d2d33476"
-SMTP_HOST = st.secrets.get("SMTP_HOST", "smtp.wedos.net")
-SMTP_PORT = int(st.secrets.get("SMTP_PORT", 465))
-SMTP_USER = st.secrets.get("SMTP_USER", "info@apartmantyrsova.cz")
-SMTP_PASS = st.secrets.get("SMTP_PASS", "")
 NOTIFY_EMAIL = st.secrets.get("NOTIFY_EMAIL", "info@apartmantyrsova.cz")
+FROM_EMAIL = st.secrets.get("FROM_EMAIL", "info@apartmantyrsova.cz")
 
 @st.cache_data(ttl=900)
 def nacti_obsazene_dny():
@@ -45,22 +41,72 @@ def vsechny_obsazene():
     return nacti_obsazene_dny() | st.session_state.lokalni_rezervace
 
 def posli_email(jmeno, email_hosta, telefon, prijezd, odjezd, pocet_osob, zprava):
-    if not SMTP_PASS:
-        return False, "SMTP heslo není nastaveno"
+    api_key = st.secrets.get("SENDGRID_API_KEY", "")
+    if not api_key:
+        return False, "SENDGRID_API_KEY není nastaven v secrets"
+
     try:
         pocet_noci = (odjezd - prijezd).days
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = f"Nova poptavka - {prijezd.strftime('%d.%m.%Y')} az {odjezd.strftime('%d.%m.%Y')}"
-        msg["From"] = SMTP_USER
-        msg["To"] = NOTIFY_EMAIL
-        text = f"Jmeno: {jmeno}\nEmail: {email_hosta}\nTelefon: {telefon}\nPrijezd: {prijezd}\nOdjezd: {odjezd}\nNoci: {pocet_noci}\nOsob: {pocet_osob}\nZprava: {zprava}"
-        msg.attach(MIMEText(text, "plain", "utf-8"))
-        with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT) as server:
-            server.login(SMTP_USER, SMTP_PASS)
-            server.sendmail(SMTP_USER, NOTIFY_EMAIL, msg.as_string())
+
+        html_content = f"""
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <div style="background-color: #1a73e8; padding: 20px; border-radius: 8px 8px 0 0;">
+                <h2 style="color: white; margin: 0;">🏠 Nová poptávka rezervace</h2>
+                <p style="color: #d2e3fc; margin: 5px 0 0 0;">Apartmán Tyršova, Znojmo</p>
+            </div>
+            <div style="background: #fff; border: 1px solid #dee2e6; border-top: none; border-radius: 0 0 8px 8px; padding: 20px;">
+                <table style="width:100%; border-collapse: collapse;">
+                    <tr style="background:#f8f9fa;">
+                        <td style="padding:8px; color:#666; width:40%;">Jméno</td>
+                        <td style="padding:8px;"><b>{jmeno}</b></td>
+                    </tr>
+                    <tr>
+                        <td style="padding:8px; color:#666;">Email</td>
+                        <td style="padding:8px;"><a href="mailto:{email_hosta}">{email_hosta}</a></td>
+                    </tr>
+                    <tr style="background:#f8f9fa;">
+                        <td style="padding:8px; color:#666;">Telefon</td>
+                        <td style="padding:8px;">{telefon}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding:8px; color:#666;">Příjezd</td>
+                        <td style="padding:8px;"><b>{prijezd.strftime('%d.%m.%Y')}</b></td>
+                    </tr>
+                    <tr style="background:#f8f9fa;">
+                        <td style="padding:8px; color:#666;">Odjezd</td>
+                        <td style="padding:8px;"><b>{odjezd.strftime('%d.%m.%Y')}</b></td>
+                    </tr>
+                    <tr>
+                        <td style="padding:8px; color:#666;">Počet nocí</td>
+                        <td style="padding:8px;">{pocet_noci}</td>
+                    </tr>
+                    <tr style="background:#f8f9fa;">
+                        <td style="padding:8px; color:#666;">Počet osob</td>
+                        <td style="padding:8px;">{pocet_osob}</td>
+                    </tr>
+                    {"<tr><td style='padding:8px; color:#666; vertical-align:top;'>Zpráva</td><td style='padding:8px;'>" + zprava + "</td></tr>" if zprava.strip() else ""}
+                </table>
+                <p style="color:#888; font-size:12px; margin-top:20px;">
+                    Odesláno: {datetime.now().strftime("%d.%m.%Y %H:%M")} | apartmantyrsova.cz
+                </p>
+            </div>
+        </div>
+        """
+
+        message = Mail(
+            from_email=FROM_EMAIL,
+            to_emails=NOTIFY_EMAIL,
+            subject=f"Nová poptávka – {jmeno} ({prijezd.strftime('%d.%m.%Y')} – {odjezd.strftime('%d.%m.%Y')}, {pocet_noci} nocí)",
+            html_content=html_content
+        )
+
+        sg = sendgrid.SendGridAPIClient(api_key=api_key)
+        sg.send(message)
         return True, "OK"
+
     except Exception as e:
         return False, str(e)
+
 
 dny_tydne_cz = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne']
 mesice_cz = ["","leden","únor","březen","duben","květen","červen",
@@ -110,7 +156,7 @@ with col1:
 
 with col2:
     st.subheader("Poptávka rezervace")
-    st.info("Vyplňte formulář a ozveme se vám do 24 hodin s potvrzením a platebními údaji.")
+    st.info("XXXXVyplňte formulář a ozveme se vám do 24 hodin s potvrzením a platebními údaji.")
 
     if st.session_state.get("odeslano"):
         st.success("Poptávka odeslána! Brzy se vám ozveme s potvrzením a platebními údaji.")
@@ -159,6 +205,7 @@ with col2:
                     st.error(ch)
             else:
                 ok, msg = posli_email(jmeno, email_hosta, telefon, prijezd, odjezd, pocet_osob, zprava)
+                st.write(f"DEBUG: ok={ok}, msg={msg}")  # dočasně
                 if ok:
                     current = prijezd
                     while current < odjezd:
