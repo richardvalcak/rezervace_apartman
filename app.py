@@ -156,10 +156,10 @@ with col1:
 
 with col2:
     st.subheader("Poptávka rezervace")
-    st.info("XXXXVyplňte formulář a ozveme se vám do 24 hodin s potvrzením a platebními údaji.")
+    st.info("Vyplňte formulář a co nejdřívě se vám ozveme s potvrzením.")
 
     if st.session_state.get("odeslano"):
-        st.success("Poptávka odeslána! Brzy se vám ozveme s potvrzením a platebními údaji.")
+        st.success("Poptávka odeslána! Brzy se vám ozveme s potvrzením.")
         if st.button("Nová rezervace"):
             st.session_state.odeslano = False
             st.rerun()
@@ -205,7 +205,7 @@ with col2:
                     st.error(ch)
             else:
                 ok, msg = posli_email(jmeno, email_hosta, telefon, prijezd, odjezd, pocet_osob, zprava)
-                st.write(f"DEBUG: ok={ok}, msg={msg}")  # dočasně
+            
                 if ok:
                     current = prijezd
                     while current < odjezd:
